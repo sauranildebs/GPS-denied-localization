@@ -18,6 +18,7 @@ true_path = Path()
 predicted_path = Path()
 
 
+
 #state transition matrix
 def iterate_x(x_in, timestep):
 
@@ -63,8 +64,9 @@ def iterate_x(x_in, timestep):
 	ret[13] = x_in[13]
 	ret[14] = x_in[14]
 
-	print(x_in[0], x_in[1], x_in[2])
+	#print(x_in[0], x_in[1], x_in[2])
 
+	'''
 	rate = rospy.Rate(500)
 
 	pose = PoseStamped()
@@ -78,6 +80,7 @@ def iterate_x(x_in, timestep):
 	predicted_path_pub.publish(predicted_path)
 	
 	rate.sleep()
+	'''
 
 	return ret
 
@@ -106,6 +109,7 @@ def imu_receiver(data):
 
 
 
+
 def geodetic_to_ecef(data):
 	global state_estimator, r_gps
 
@@ -125,7 +129,9 @@ def geodetic_to_ecef(data):
 
 	xNorth, yWest, zUp = ecef_to_enu(x, y, z, 49.860246, 8.687077, 0.0)
 	gps_data = [xNorth, yWest, zUp]
+
 	state_estimator.update([0, 1, 2], gps_data, r_gps)
+
 
 
 def ecef_to_enu(x, y, z, lat0, lon0, h0):
@@ -156,6 +162,8 @@ def ecef_to_enu(x, y, z, lat0, lon0, h0):
 
 	return xNorth, yWest, zUp
 
+'''
+
 def ground_truth(data):
 	global true_path, true_path_pub
 	true_path.header = data.header
@@ -164,10 +172,15 @@ def ground_truth(data):
 	pose.pose = data.pose.pose
 	true_path.poses.append(pose)
 	true_path_pub.publish(true_path)
+'''
 
 
 def main():
 	global inital_timestamp, state_estimator, r_imu, R_prev, r_gps, true_path_pub, predicted_path_pub
+
+	states_arr = np.empty((1, 15, 0))
+	sigmas_arr = np.empty((15, 31, 0))
+	W = 10
 
 	inital_timestamp = 0.0
 	R_prev = np.zeros((3, 3))
@@ -179,14 +192,14 @@ def main():
 	r_gps = 0.000001 * np.eye(3)	#GPS measurement noise covariance  needs to be updated for adaptive UKF
 
 
-	state_estimator = UKF(15, q, np.zeros(15), 0.000001 * np.eye(15), 0.001, 0, 2, iterate_x)
+	state_estimator = UKF(15, q, np.zeros(15), 0.000001 * np.eye(15), 0.001, 0, 2, iterate_x, states_arr, sigmas_arr, W)
 
 	rospy.init_node('mainSim', anonymous = True)
 	rospy.Subscriber('raw_imu', Imu, imu_receiver)
 	rospy.Subscriber("fix", NavSatFix, geodetic_to_ecef)
-	rospy.Subscriber('ground_truth/state', Odometry, ground_truth)
-	true_path_pub = rospy.Publisher('true_path', Path, queue_size = 10)
-	predicted_path_pub = rospy.Publisher('predicted_path', Path, queue_size = 10)
+	#rospy.Subscriber('ground_truth/state', Odometry, ground_truth)
+	#true_path_pub = rospy.Publisher('true_path', Path, queue_size = 10)
+	#predicted_path_pub = rospy.Publisher('predicted_path', Path, queue_size = 10)
 	rospy.spin()
 
 if __name__ == "__main__":
